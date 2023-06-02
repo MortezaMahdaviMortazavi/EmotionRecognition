@@ -1,3 +1,5 @@
+# from __future__ import unicode_literals
+
 import torch
 import pickle
 import re
@@ -6,6 +8,7 @@ from torch.utils.data import Dataset,DataLoader
 from vocabulary import Vocabulary
 from configs import *
 from hazm import *
+
 
 class ArmanDataset(Dataset):
     def __init__(self, mode='train', vocab_path='vocab.pkl', vocab_threshold=5, vocab_from_file=False):
@@ -68,7 +71,7 @@ class ArmanDataset(Dataset):
         with open(filepath, 'rb') as f:
             my_dict = pickle.load(f)
 
-        vocab = Vocabulary()
+        vocab = Vocabulary(texts=self.texts)
         vocab.word2index = my_dict
         vocab.index2word = {v: k for k, v in my_dict.items()}
         vocab.word2count = {k: 1 for k in my_dict.keys()}
@@ -84,7 +87,7 @@ class ArmanDataset(Dataset):
 
         # tokens = word_tokenize(tokens)
         indexed_tokens = [self.vocab.get_word_index(token) for token in tokens]
-        indexed_tokens = [idx for idx in indexed_tokens if idx not in [self.vocab.word2index['<UNK>'], self.vocab.word2index['<PAD>']]]
+        # indexed_tokens = [idx for idx in indexed_tokens if idx not in [self.vocab.word2index['<UNK>'], self.vocab.word2index['<PAD>']]]
 
         # Padding
         padding_length = self.vocab.max_text_length - len(indexed_tokens)
@@ -105,7 +108,8 @@ def create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=5, v
 
 
 if __name__ == "__main__":
-    train_dataloader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=5, vocab_from_file=False, batch_size=32, shuffle=True)
-    test_dataloader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=5, vocab_from_file=False, batch_size=32, shuffle=False)
-    print(len(train_dataloader.dataset.vocab.word2index))
-    print(len(test_dataloader.dataset.vocab.word2index))
+    train_dataloader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=10, vocab_from_file=False, batch_size=32, shuffle=True)
+    test_dataloader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=10, vocab_from_file=True, batch_size=32, shuffle=False)
+    print(train_dataloader.dataset.vocab.word2index)
+    # print(len(test_dataloader.dataset.vocab.word2index))
+    

@@ -1,3 +1,5 @@
+# from __future__ import unicode_literals
+
 import os
 import pandas as pd
 import re
@@ -14,6 +16,9 @@ class Vocabulary:
         Args:
         - name (str): Name of the vocabulary, default is 'persian'.
         """
+        self.stemmer = Stemmer()
+        self.lemmatizer = Lemmatizer()
+
         self.name = name
         self.vocab_threshold = vocab_threshold
         self.word2index = {}
@@ -25,7 +30,6 @@ class Vocabulary:
         self.word2index['<UNK>'] = 1
         self.index2word[0] = '<PAD>'
         self.build_vocab(texts=texts)
-        
 
 
     def remove_last_if_english(self,lst):
@@ -58,6 +62,8 @@ class Vocabulary:
         Args:
         - word (str): Word to be added to the vocabulary.
         """
+        word = self.stemmer.stem(word)
+        word = self.lemmatizer.lemmatize(word)
         if word not in self.word2count:
             self.word2count[word] = 1
         else:

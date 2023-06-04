@@ -8,6 +8,9 @@ PERSIAN_EMOTION_PATH = 'datasets/Persian-Emotion-Detection-main/dataset.csv'
 ARMAN_TEXT_TRAIN_PATH = 'datasets/arman-text-emotion-main/train.tsv'
 ARMAN_TEXT_TEST_PATH = 'datasets/arman-text-emotion-main/test.tsv'
 
+EMBEDDING_FILE = 'datasets/cc.fa.300.vec'
+SAVED_EMBEDDING_FILE = 'datasets/embeddings.pkl'
+
 BATCH_SIZE = 1
 
 # PERSIAN_EMOTION_DATASET = pd.read_csv(PERSIAN_EMOTION_PATH,encoding='utf-8')

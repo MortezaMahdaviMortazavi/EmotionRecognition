@@ -63,7 +63,7 @@ class Vocabulary:
         - word (str): Word to be added to the vocabulary.
         """
         word = self.stemmer.stem(word)
-        word = self.lemmatizer.lemmatize(word)
+        # word = self.lemmatizer.lemmatize(word)
         if word not in self.word2count:
             self.word2count[word] = 1
         else:

@@ -8,6 +8,9 @@ from torch.utils.data import Dataset,DataLoader
 from vocabulary import Vocabulary
 from configs import *
 from hazm import *
+from models import ParsBERT
+
+# Access the word vector for a specific word
 
 
 class ArmanDataset(Dataset):
@@ -23,11 +26,14 @@ class ArmanDataset(Dataset):
         with open(self.data_path, 'r', encoding='utf-8') as f:
             self.texts = f.readlines()
 
+
         if vocab_from_file:
             self.vocab = self.load_vocab(vocab_path)
         else:
             self.vocab = Vocabulary(texts=self.texts, vocab_threshold=vocab_threshold)
             self.save_vocab(vocab_path)
+
+        self.tokenizer = word_tokenize
 
         self.x_to_y = {}
         self.labels = {'sad':0,'hate':1,'fear':2,'angry':3,'happy':4,'surprise':5,'other':6}
@@ -38,7 +44,7 @@ class ArmanDataset(Dataset):
             self.data_separator(text)
 
     def data_separator(self,text):
-        tokens = word_tokenize(text)
+        tokens = self.tokenizer(text)
         last_item = tokens[-1]
         if re.search('[a-zA-Z]', last_item):
             tokens.pop()
@@ -85,7 +91,7 @@ class ArmanDataset(Dataset):
         tokens = list(self.x_to_y.keys())[index]
         label = self.x_to_y[tokens]
 
-        # tokens = word_tokenize(tokens)
+        # tokens = self.tokenizer(tokens)
         indexed_tokens = [self.vocab.get_word_index(token) for token in tokens]
         # indexed_tokens = [idx for idx in indexed_tokens if idx not in [self.vocab.word2index['<UNK>'], self.vocab.word2index['<PAD>']]]
 
@@ -108,8 +114,7 @@ def create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=5, v
 
 
 if __name__ == "__main__":
-    train_dataloader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=10, vocab_from_file=False, batch_size=32, shuffle=True)
-    test_dataloader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=10, vocab_from_file=True, batch_size=32, shuffle=False)
-    print(train_dataloader.dataset.vocab.word2index)
+    train_dataloader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=False, batch_size=32, shuffle=True)
+    test_dataloader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=True, batch_size=32, shuffle=False)
+    print(test_dataloader.dataset[0][0])
     # print(len(test_dataloader.dataset.vocab.word2index))
-    

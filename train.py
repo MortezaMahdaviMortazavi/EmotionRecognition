@@ -4,9 +4,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
-from models import LSTMModel,Embedding
-from dataloader import create_dataloader
-from embedding import TransformersTokenizer
+# from models import LSTMModel,Embedding
+# from dataloader import create_dataloader
+# from embedding import TransformersTokenizer
 
 class Trainer:
     def __init__(self, model, criterion, optimizer, device):
@@ -83,31 +83,31 @@ class Trainer:
         return avg_loss, accuracy
 
 
-def main():
-    # Prepare the data
-    train_loader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=False, batch_size=128, shuffle=True)
-    test_loader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=True, batch_size=64, shuffle=False)
-    # Define hyperparameters and model
-    input_size = len(train_loader.dataset.vocab.word2index)  # Input size based on your data
-    hidden_size = 105
-    num_layers = 2
-    num_classes = 7  # Number of classes based on your data
+# def main():
+#     # Prepare the data
+#     train_loader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=False, batch_size=128, shuffle=True)
+#     test_loader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=True, batch_size=64, shuffle=False)
+#     # Define hyperparameters and model
+#     input_size = len(train_loader.dataset.vocab.word2index)  # Input size based on your data
+#     hidden_size = 105
+#     num_layers = 2
+#     num_classes = 7  # Number of classes based on your data
 
-    model = LSTMModel(input_size, hidden_size, num_layers, num_classes).cuda()
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.008)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     model = LSTMModel(input_size, hidden_size, num_layers, num_classes).cuda()
+#     criterion = nn.CrossEntropyLoss()
+#     optimizer = optim.Adam(model.parameters(), lr=0.008)
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Training loop
-    num_epochs = 1000
+#     # Training loop
+#     num_epochs = 1000
 
-        # Instantiate the Trainer
-    trainer = Trainer(model, criterion, optimizer, device)
+#         # Instantiate the Trainer
+#     trainer = Trainer(model, criterion, optimizer, device)
 
-    # Call the fit function
-    trainer.fit(train_loader, test_loader, num_epochs)
+#     # Call the fit function
+#     trainer.fit(train_loader, test_loader, num_epochs)
 
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

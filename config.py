@@ -4,7 +4,7 @@ HIDDEN_SIZE = None
 NUM_LAYERS = None
 LEARNING_RATE = None
 BATCH_SIZE = None
-MAX_LEN = None
+MAX_LEN = 128
 
 # PyTorch Lightning hyperparameters
 MAX_EPOCHS = None
@@ -18,6 +18,9 @@ HAPPINESS = None
 WONDER = None
 HATRESS = None
 SADNESS = None
+
+# Addition
+NUMBER_OF_AUGMENTATION_WANTED = 300
 
 
 # Path

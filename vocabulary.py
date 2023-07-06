@@ -2,47 +2,43 @@ import os
 import pandas as pd
 import re
 import pickle
-
+import hazm
 import config
+import tqdm
 
-from hazm import *
+from preprocessing import Preprocessing
 
 class Vocabulary:
-    def __init__(self,texts,vocab_threshold=3,name='persian'):
+    def __init__(self,texts,vocab_threshold=3,name='arman'):
         """
         Initialize the Vocabulary class.
 
         Args:
         - name (str): Name of the vocabulary, default is 'persian'.
         """
-        self.stemmer = Stemmer()
-        self.lemmatizer = Lemmatizer()
-        self.normalizer = Normalizer()
+
 
         self.name = name
         self.vocab_threshold = vocab_threshold
         self.word2index = {}
         self.index2word = {}
         self.word2count = {}
-        self.max_text_length = 105
-        
+        self.max_text_length = config.MAX_LEN
+
+
+        self.preprocessor = Preprocessing(dataset=name)
         self.word2index['<PAD>'] = 0
         self.word2index['<UNK>'] = 1
         self.index2word[0] = '<PAD>'
-        self.labels = {}
-        self.label_idx = 0
         self.build_vocab(texts=texts)
+        self.labels = self.preprocessor.get_labels()
 
 
-    def remove_last_if_english(self,lst):
-        last_item = lst[-1]
-        if re.search('[a-zA-Z]', last_item):
-            if last_item not in self.labels:
-                self.labels[last_item] = self.label_idx
-                self.label_idx += 1
-            lst.pop()
-        return lst
+    def __call__(self,word):
+        return self.word2index[word]
 
+    def __repr__(self) -> str:
+        return f"Labels : {self.labels} | length of vocab : {len(self.word2index)}"
 
     def build_vocab(self, texts):
         """
@@ -51,13 +47,11 @@ class Vocabulary:
         Args:
         - texts (list): List of text samples to build the vocabulary from.
         """
-        for text in texts:
-            normalized_text = self.normalizer.normalize(text)
-            tokens = word_tokenize(normalized_text)
-            tokens = self.remove_last_if_english(tokens)
+        for text in tqdm.tqdm(texts):
+            cleaned_text = self.preprocessor(text)
+            tokens = hazm.word_tokenize(cleaned_text)
             self.add_words(tokens)
 
-        # print(self.labels)
 
     def add_word(self, word):
         """
@@ -66,7 +60,6 @@ class Vocabulary:
         Args:
         - word (str): Word to be added to the vocabulary.
         """
-        word = self.stemmer.stem(word)
         # word = self.lemmatizer.lemmatize(word)
         if word not in self.word2count:
             self.word2count[word] = 1
@@ -125,19 +118,16 @@ class Vocabulary:
     def get_labels(self):
         return self.labels
 
-    def __call__(self,word):
-        return self.word2index[word]
 
 
 
 if __name__ == "__main__":
 
     # PERSIAN_EMOTION_DATASET = pd.read_csv(config.ARMAN_TRAIN,encoding='utf-8')
-    INTRO_DATASET = pd.read_csv(config.TEST_FILE,encoding='utf-8')
 
     with open(config.ARMAN_VAL,'r',encoding='utf-8') as f:
         texts = f.readlines()
 
-    vocab = Vocabulary(texts=texts,vocab_threshold=3)
-    print(vocab.get_labels())
+    vocab = Vocabulary(texts=texts,vocab_threshold=3,name='arman')
+    print(vocab)
     

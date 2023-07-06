@@ -5,11 +5,12 @@ import pickle
 import hazm
 import config
 import tqdm
+import utils
 
 from preprocessing import Preprocessing
 
 class Vocabulary:
-    def __init__(self,texts,vocab_threshold=3,name='arman'):
+    def __init__(self,texts,vocab_threshold=3,name='arman',load=False):
         """
         Initialize the Vocabulary class.
 
@@ -30,8 +31,14 @@ class Vocabulary:
         self.word2index['<PAD>'] = 0
         self.word2index['<UNK>'] = 1
         self.index2word[0] = '<PAD>'
-        self.build_vocab(texts=texts)
+
+        if load:
+            self.word2index = utils.load_vocab(config.VOCAB_PATH)
+        else:
+            self.build_vocab(texts=texts)
+            
         self.labels = self.preprocessor.get_labels()
+        
 
 
     def __call__(self,word):
@@ -48,7 +55,7 @@ class Vocabulary:
         - texts (list): List of text samples to build the vocabulary from.
         """
         for text in tqdm.tqdm(texts):
-            cleaned_text = self.preprocessor(text)
+            cleaned_text = self.preprocessor(text)[0]
             tokens = hazm.word_tokenize(cleaned_text)
             self.add_words(tokens)
 
@@ -125,9 +132,16 @@ if __name__ == "__main__":
 
     # PERSIAN_EMOTION_DATASET = pd.read_csv(config.ARMAN_TRAIN,encoding='utf-8')
 
-    with open(config.ARMAN_VAL,'r',encoding='utf-8') as f:
-        texts = f.readlines()
+    with open(config.ARMAN_TRAIN,'r',encoding='utf-8') as f:
+        texts_train = f.readlines()
 
-    vocab = Vocabulary(texts=texts,vocab_threshold=3,name='arman')
+    with open(config.ARMAN_VAL,'r',encoding='utf-8') as f:
+        texts_val = f.readlines()
+
+    texts_train.extend(texts_val)
+    texts = texts_train
+    
+    # print(f"texts length: {len(texts)}",f"texts_train length: {len(texts_train)}",f"texts_val length: {len(texts_val)}")
+    vocab = Vocabulary(texts=texts,vocab_threshold=2,name='arman')
     print(vocab)
     

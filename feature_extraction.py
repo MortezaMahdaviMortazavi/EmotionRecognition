@@ -3,12 +3,13 @@ import prettytable
 import symspellpy
 import jellyfish
 import re
+import config
 
 import dadmatools.pipeline.language as language
 
 
 from symspellpy.symspellpy import SymSpell, Verbosity
-
+from hazm import WordTokenizer,POSTagger
 
 class BertSPellChecker():
     def __init__(self, max_edit_distance_dictionary, prefix_length, bert_model):
@@ -25,9 +26,13 @@ class BertSPellChecker():
 
 class FeatureExtraction(object):
 
-    def __init__(self,tokenizer):
+    def __init__(self,
+                 tokenizer,
+                 tagger_model=config.TAGGER_MODEL_PATH
+                ):
 
-        self.tokenizer = tokenizer
+        self.tokenizer = WordTokenizer()
+        self.tagger = tagger = POSTagger(model=tagger_model)
         self.features = {}
 
     # Emoji
@@ -40,11 +45,13 @@ class FeatureExtraction(object):
 
     # Parts of SPeech(pos)
     def get_pos(self,text):
-        pass
+        tagged_text = self.tagger.tag(self.tokenizer.tokenize(text))
+        return tagged_text
 
     # Hashtags
     def get_hashtags(self,text):
-        pass
+        hashtags = re.findall(r'#\w+', text)
+        return hashtags
 
     # Misspelled words
     def get_misspelled_words(self,text):
@@ -52,15 +59,16 @@ class FeatureExtraction(object):
 
     
     def __call__(self,text):
+        self.features['input'] = text
         self.features['emojies'] = self.get_emojies(text)
-        self.features['pos'] = None
-        self.features['hashtags'] = None
+        self.features['pos'] = self.get_pos(text)
+        self.features['hashtags'] = self.get_hashtags(text)
         self.features['misspelled'] = None
 
-def pos_tag(text):
-    tagger = POSTagger()
-    tagged_text = tagger.tag(hazm.word_tokenize(text))
-    return tagged_text
+# def pos_tag(text):
+#     tagger = POSTagger()
+#     tagged_text = tagger.tag(hazm.word_tokenize(text))
+#     return tagged_text
 
 # if __name__ == "__main__":
 #     # spell_checker = BertSPellChecker(None,None,None)
@@ -103,25 +111,6 @@ def pos_tag(text):
 #     #دادماتولز نسخش سال منتشر تولز بتونه کار متن براتون شیرین‌تر راحت‌تر کنه ایمیل ارتباط آدرس گیت‌هاب معرف حضور مبارک
 #     print(normalized_text)
 
-#     from hazm import POSTagger
-#     import hazm
-
-
-#     # Example usage
-#     text = "من دارم به پارک می‌روم."
-#     tagged_text = pos_tag(text)
-#     print(tagged_text)
 
 
 
-from hazm import POSTagger, word_tokenize
-
-def pos_tag(text):
-    tagger = POSTagger(model='resources/postagger.model')
-    tagged_text = tagger.tag(word_tokenize(text))
-    return tagged_text
-
-# Example usage
-text = "من دارم به پارک می‌روم."
-tagged_text = pos_tag(text)
-print(tagged_text)

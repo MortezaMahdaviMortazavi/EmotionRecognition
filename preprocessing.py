@@ -8,9 +8,7 @@ import re
 import hazm
 import utils
 
-
 import re
-import hazm
 
 class Preprocessing(object):
     """
@@ -45,18 +43,22 @@ class Preprocessing(object):
                 self.labels[last_item] = self.label_idx
                 self.label_idx += 1
 
+            return last_item
+        
+        return None
+
     def __call__(self, text):
         normalized_text = self.normalize(text)
         
         if self.dataset == 'arman':
-            self.label_getter(normalized_text)
+            target = self.label_getter(normalized_text)
 
         cleaned_text = self.remove_english_chars(normalized_text)
         cleaned_text = self.remove_misspelled_letters(cleaned_text)
         cleaned_text = self.remove_arabic_diacritics(cleaned_text)
         cleaned_text = self.remove_non_persian_chars(cleaned_text)
         cleaned_text = self.remove_hashtags(cleaned_text)
-        return cleaned_text
+        return cleaned_text, target
     
     def get_labels(self):
         return self.labels
@@ -113,8 +115,15 @@ class Preprocessing(object):
 
 
 if __name__ == "__main__":
-    with open(config.ARMAN_VAL,'r',encoding='utf-8') as f:
-        texts = f.readlines()
-    obj = Preprocessing('arman')
-    for text in texts:
-        utils.write_text_to_file(obj(text)+'\n','cleaned_text.txt')
+    # Create an instance of Preprocessing
+    preprocessor = Preprocessing(dataset='arman')
+
+    # Test text
+    text = "This is a test text. ما همچنین فارسی را پشتیبانی می‌کنیم."
+
+    # Preprocess the text
+    cleaned_text = preprocessor(text)
+
+    # Print the cleaned text
+    print("Cleaned Text:")
+    

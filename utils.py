@@ -1,5 +1,7 @@
 
 import pandas as pd
+import pickle
+
 from sklearn.model_selection import train_test_split
 
 def read_data(address):
@@ -30,3 +32,22 @@ def write_text_to_file(text,file_path):
     with open(file_path, 'a',encoding='utf-8') as file:
         file.write(text)
     print(f"Text written to file: {file_path}")
+
+
+
+def save_vocab(vocab, path):
+    with open(path, 'wb') as file:
+        pickle.dump(vocab, file)
+    print(f"Vocabulary saved to: {path}")
+
+def load_vocab(path):
+    with open(path, 'rb') as file:
+        vocab = pickle.load(file)
+    return vocab
+
+# # Example usage
+# vocab = {'apple': 1, 'banana': 2, 'orange': 3}
+# save_vocab(vocab, 'vocab.pkl')
+
+# loaded_vocab = load_vocab('vocab.pkl')
+# print(loaded_vocab)

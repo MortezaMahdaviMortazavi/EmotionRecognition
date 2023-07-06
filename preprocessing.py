@@ -23,12 +23,6 @@ class Preprocessing(object):
     """
 
     _instance = None
-
-    # This class created by singletone pattern so you only can use one object of it in each step
-    # def __new__(cls, *args, **kwargs):
-    #     if not cls._instance:
-    #         cls._instance = super(Preprocessing, cls).__new__(cls, *args, **kwargs)
-    #     return cls._instance
     
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
@@ -37,7 +31,7 @@ class Preprocessing(object):
 
 
     def __init__(self,dataset):
-        assert dataset in ['arman','emppars','else']
+        assert dataset in ['arman','emopars','else']
 
         self.dataset = dataset
         self.labels = {}
@@ -119,7 +113,8 @@ class Preprocessing(object):
 
 
 if __name__ == "__main__":
+    with open(config.ARMAN_VAL,'r',encoding='utf-8') as f:
+        texts = f.readlines()
     obj = Preprocessing('arman')
-    text = 'دیشب بعد از ارسال تویت مربوط به آثار باستانی تویت دیگری نوشتم ولی هرچه منتظر شدم ارسال نشد، از همون موقع تا الان تویتر نداشتم، ناراحت بودم که نکنه پیامی داده باشین ومن نبینم که الحمدالله خبری نیست خوب، چه خبر؟ من نبودم خوش گذشته؟	HAPPY'
-    text = obj(text)
-    utils.write_text_to_file(text,'cleaned_text.txt')
+    for text in texts:
+        utils.write_text_to_file(obj(text)+'\n','cleaned_text.txt')

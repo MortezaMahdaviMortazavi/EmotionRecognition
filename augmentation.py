@@ -27,16 +27,16 @@ def augment():
     for text in tqdm(texts):
         for i in range(config.NUMBER_OF_AUGMENTATION_WANTED):
             # Swap
-            aug = naw.RandomWordAug(action='swap', aug_p=0.6)
+            aug = naw.RandomWordAug(action='swap', aug_p=config.SWAP_P)
             augmented_text = aug.augment(text)
             # Synonym replacement
-            aug = naw.ContextualWordEmbsAug(model_path='HooshvareLab/bert-fa-base-uncased', action="substitute", aug_p=0.6, device='cuda')
+            aug = naw.ContextualWordEmbsAug(model_path='HooshvareLab/bert-fa-base-uncased', action="substitute", aug_p=config.SYN_REPLACEMENT_P, device=config.DEVICE)
             augmented_text = aug.augment(augmented_text)
             # Deletion
-            aug = naw.RandomWordAug(action='swap', aug_p=0.3)
+            aug = naw.RandomWordAug(action='swap', aug_p=config.DELETION_P)
             augmented_text = aug.augment(augmented_text)
             # Insertion
-            aug = naw.ContextualWordEmbsAug(model_path='HooshvareLab/bert-fa-base-uncased', action="insert", aug_p=0.3, device='cuda')
+            aug = naw.ContextualWordEmbsAug(model_path='HooshvareLab/bert-fa-base-uncased', action="insert", aug_p=config.INSERTION_P, device=config.DEVICE)
             augmented_text = aug.augment(augmented_text)
 
             augmeneted_data["text"].append(augmented_text)

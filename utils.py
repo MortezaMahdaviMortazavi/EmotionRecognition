@@ -26,7 +26,7 @@ def read_data(address):
 
 
 
-def write_text_to_file(text, file_path):
-    with open(file_path, 'w', encoding='utf-8') as file:
+def write_text_to_file(text,file_path):
+    with open(file_path, 'a',encoding='utf-8') as file:
         file.write(text)
     print(f"Text written to file: {file_path}")

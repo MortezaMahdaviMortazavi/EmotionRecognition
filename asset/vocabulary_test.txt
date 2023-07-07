@@ -1,0 +1,6 @@
+Index of 'کوچیک': 3
+Labels : {'SAD': 0, 'HATE': 1, 'OTHER': 2} | length of vocab : 83
+Index of 'خنده': 80
+Word at index 2: خیلی
+Vocabulary Size: 83
+Labels : {'SAD': 0, 'HAPPY': 1, 'OTHER': 2, 'SURPRISE': 3, 'FEAR': 4, 'HATE': 5, 'ANGRY': 6}

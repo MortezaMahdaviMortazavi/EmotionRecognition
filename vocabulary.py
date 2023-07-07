@@ -31,13 +31,16 @@ class Vocabulary:
         self.word2index['<PAD>'] = 0
         self.word2index['<UNK>'] = 1
         self.index2word[0] = '<PAD>'
+        self.labels = None
 
         if load:
             self.word2index = utils.load_vocab(config.VOCAB_PATH)
+            self.labels = utils.load_vocab(config.LABELS_PATH)
         else:
             self.build_vocab(texts=texts)
-            
-        self.labels = self.preprocessor.get_labels()
+            self.labels = self.preprocessor.get_labels()
+            utils.save_vocab(self.word2index,config.VOCAB_PATH)
+            utils.save_vocab(self.labels,path=config.LABELS_PATH)
         
 
 
@@ -58,7 +61,6 @@ class Vocabulary:
             cleaned_text = self.preprocessor(text)[0]
             tokens = hazm.word_tokenize(cleaned_text)
             self.add_words(tokens)
-
 
     def add_word(self, word):
         """
@@ -139,7 +141,7 @@ if __name__ == "__main__":
         texts_val = f.readlines()
 
     texts_train.extend(texts_val)
-    texts = texts_train
+    texts = texts_val
     
     # print(f"texts length: {len(texts)}",f"texts_train length: {len(texts_train)}",f"texts_val length: {len(texts_val)}")
     vocab = Vocabulary(texts=texts,vocab_threshold=2,name='arman')

@@ -5,6 +5,7 @@ import config
 from tqdm import tqdm
 
 def augment():
+    # Labels : {'SAD': 0, 'HAPPY': 1, 'OTHER': 2, 'SURPRISE': 3, 'FEAR': 4, 'HATE': 5, 'ANGRY': 6}
     targets = ["Anger", "Fear", "Happiness", "Hatred", "Sadness", "Wonder"]
     target = targets[2]
 

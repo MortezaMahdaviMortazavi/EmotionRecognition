@@ -35,7 +35,7 @@ ARMAN_VAL = 'datasets/arman-text-emotion-main/test.tsv'
 TEST_FILE = 'datasets/test.csv'
 TAGGER_MODEL_PATH = 'resources/pos_tagger.model'
 VOCAB_PATH = 'resources/vocab.pkl'
-
+LABELS_PATH = 'resources/labels.pkl'
 
 # Augmentation
 SWAP_P = 0.6

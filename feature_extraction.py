@@ -27,11 +27,10 @@ class BertSPellChecker():
 class FeatureExtraction(object):
 
     def __init__(self,
-                 tokenizer,
                  tagger_model=config.TAGGER_MODEL_PATH
                 ):
 
-        self.tokenizer = WordTokenizer()
+        self.tokenizer = WordTokenizer().tokenize
         self.tagger = tagger = POSTagger(model=tagger_model)
         self.features = {}
 
@@ -45,7 +44,7 @@ class FeatureExtraction(object):
 
     # Parts of SPeech(pos)
     def get_pos(self,text):
-        tagged_text = self.tagger.tag(self.tokenizer.tokenize(text))
+        tagged_text = self.tagger.tag(self.tokenizer(text))
         return tagged_text
 
     # Hashtags

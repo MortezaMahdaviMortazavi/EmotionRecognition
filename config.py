@@ -9,6 +9,7 @@ HIDDEN_SIZE = None
 NUM_LAYERS = None
 LEARNING_RATE = None
 BATCH_SIZE = None
+NUM_CLASSES = 7
 MAX_SEQ_LEN = 128
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -18,12 +19,12 @@ EARLY_STOPPING_PATIENCE = None
 TRAIN_PERCENT_CHECK = None
 
 # CLASS_WEIGHT:
-ANGER = None
-FEAR = None
-HAPPINESS = None
-WONDER = None
-HATRESS = None
-SADNESS = None
+ANGER_W = None
+FEAR_W = None
+HAPPINESS_W = None
+WONDER_W = None
+HATRESS_W = None
+SADNESS_W = None
 
 # Addition
 NUMBER_OF_AUGMENTATION_WANTED = 10

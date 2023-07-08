@@ -33,13 +33,13 @@ class ArmanDataset(torch.utils.data.Dataset):
         file_path = config.ARMAN_TRAIN if self.dataset_type == 'train' else config.ARMAN_VAL
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                texts = [line.rstrip() for line in f]
+                texts = [line.rstrip() for line in tqdm(f)]
         except FileNotFoundError:
             print(f"Error: File {file_path} not found.")
         except IOError as e:
             print(f"Error: {e}")        
 
-        for text in tqdm(texts[:10]):
+        for text in tqdm(texts[:50]):
             clean_text , target = self.preprocessor(text)
             self.texts.append(clean_text)
             self.targets.append(target)
@@ -48,43 +48,35 @@ class ArmanDataset(torch.utils.data.Dataset):
         return len(self.texts)
     
     def __repr__(self):
-        return f"Sample: {self[1][0]} , sample target: {self[1][1]}"
+        return f"Sample: {self[1]}"
     
     def __getitem__(self, idx):
         text = self.texts[idx]
-        _input = []
         if self.has_target:
-            target = self.targets[idx]
+            target = self.labels_dict[self.targets[idx]]
 
-        if self.tokenizer_type == 'hazm':
-            # Tokenize using Hazm tokenizer
-            tokens = self.tokenizer.tokenize(text)
-            for token in tokens:
-                try:
-                    _input.append(self.vocab(token))
-                except KeyError:
-                    _input.append(self.vocab.word2index['<UNK>'])
+        tokenized_text = self.tokenizer.tokenize(text)
 
-        elif self.tokenizer_type == 'parsbert':
-            # Tokenize using ParsBERT tokenizer
-            tokens = self.tokenizer.tokenize(text, add_special_tokens=True)
+        if len(tokenized_text) < config.MAX_SEQ_LEN:
+            tokenized_text += ['[PAD]'] * (config.MAX_SEQ_LEN - len(tokenized_text))
         else:
-            raise ValueError("Invalid tokenizer_type. Supported values: 'hazm', 'parsbert'")
+            tokenized_text = tokenized_text[:config.MAX_SEQ_LEN]
 
-        label = self.labels_dict[target]
+        input_ids = self.tokenizer.convert_tokens_to_ids(tokenized_text)
+        attention_mask = [1] * len(input_ids)
 
-        # Perform padding if necessary
-        if len(_input) < config.MAX_SEQ_LEN:
-            # Pad sequence with zeros
-            _input += [0] * (config.MAX_SEQ_LEN - len(_input))
-        else:
-            # Truncate sequence
-            _input = _input[:config.MAX_SEQ_LEN]
-        
-        _input = torch.tensor(_input)
-        label = torch.tensor(label)
+        # Convert to tensors
+        padded_input_ids = torch.tensor(input_ids).unsqueeze(0)
+        padded_attention_mask = torch.tensor(attention_mask).unsqueeze(0)
+        label = torch.tensor(target)
 
-        return _input, label
+        _instance = {
+            "input":padded_input_ids,
+            "label":label,
+            "mask":padded_attention_mask
+        }
+
+        return _instance
 
 
 def create_dataloader(
@@ -112,5 +104,5 @@ def create_dataloader(
 
 
 if __name__ == "__main__":
-    dataset = ArmanDataset('val')
-    print(dataset)
+    dataloader = create_dataloader('val',)
+    print(len(dataloader.dataset))

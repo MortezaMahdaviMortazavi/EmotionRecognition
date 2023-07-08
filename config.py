@@ -2,6 +2,7 @@ import torch
 
 from vocabulary import Vocabulary
 from hazm import WordTokenizer
+from transformers import AutoTokenizer
 
 # Pytorch
 HIDDEN_SIZE = None
@@ -36,8 +37,9 @@ TEST_FILE = 'datasets/test.csv'
 TAGGER_MODEL_PATH = 'resources/pos_tagger.model'
 VOCAB_PATH = 'resources/vocab.pkl'
 VOCAB_THRESHOLD3_PATH = 'resources/vocab.pkl'
-
 LABELS_PATH = 'resources/labels.pkl'
+CHECKPOINT_DIR = 'checkpoints/'
+LOGFILE = 'logs/logfile.txt'
 
 
 # Augmentation
@@ -48,5 +50,5 @@ INSERTION_P = 0.3
 
 
 # Specific functions
-TOKENIZER = WordTokenizer()
+TOKENIZER = AutoTokenizer.from_pretrained('HooshvareLab/bert-base-parsbert-uncased')
 # VOCABULARY = 

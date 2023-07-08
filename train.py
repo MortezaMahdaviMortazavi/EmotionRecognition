@@ -1,113 +1,100 @@
+import pytorch_lightning as pl
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import numpy as np
 
-# from models import LSTMModel,Embedding
-# from dataloader import create_dataloader
-# from embedding import TransformersTokenizer
+from torch import nn
+from torch.optim import optimizer
+from torch.utils.data import DataLoader
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
 
-class Trainer:
+import config
+import utils
+
+class LightningTrainer(pl.LightningModule):
     def __init__(self, model, criterion, optimizer, device):
+        super().__init__()
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
-        self.train_losses = []
-        self.valid_losses = []
-        self.train_accuracies = []
-        self.valid_accuracies = []
+        self.log_file = config.LOGFILE
 
-    def fit(self, train_loader, valid_loader, num_epochs):
-        for epoch in range(num_epochs):
-            print(f"Epoch {epoch+1}/{num_epochs}", end=" | ")
-            train_loss, train_acc = self.train_one_epoch(train_loader)
-            valid_loss, valid_acc = self.evaluate(valid_loader)
-            self.train_losses.append(train_loss)
-            self.valid_losses.append(valid_loss)
-            self.train_accuracies.append(train_acc)
-            self.valid_accuracies.append(valid_acc)
-            print(f"Train Loss: {train_loss:.4f} Accuracy: % {train_acc * 100:.4f}", end=" | ")
-            print(f"Valid Loss: {valid_loss:.4f} Accuracy: % {valid_acc * 100:.4f}")
+    def forward(self, x):
+        return self.model(x)
 
-    def train_one_epoch(self, train_loader):
-        self.model.train()
-        total_loss = 0
-        correct = 0
-        total = 0
+    def training_step(self, batch, batch_idx):
+        return self.common_step(batch, step_name="train")
 
-        for inputs, labels in train_loader:
-            inputs = inputs.float().to(self.device)
-            labels = labels.long().to(self.device)
+    def validation_step(self, batch, batch_idx):
+        return self._common_step(batch, step_name="val")
 
-            self.optimizer.zero_grad()
+    def test_step(self, batch, batch_idx):
+        return self._common_step(batch, step_name="test")
+    
+    def _common_step(self, batch, step_name):
+        inputs, labels = batch
+        inputs = inputs.float().to(self.device)
+        labels = labels.long().to(self.device)
 
-            outputs = self.model(inputs)
-            loss = self.criterion(outputs, labels)
-            loss.backward()
-            self.optimizer.step()
+        outputs = self.model(inputs)
+        loss = self.criterion(outputs, labels)
 
-            total_loss += loss.item()
+        _, predicted = outputs.max(1)
+        accuracy = torch.sum(predicted == labels).item() / labels.size(0)
 
-            _, predicted = outputs.max(1)
-            correct += predicted.eq(labels).sum().item()
-            total += labels.size(0)
+        self.log(f'{step_name}_loss', loss, on_step=step_name=="train", on_epoch=True, prog_bar=True)
+        self.log(f'{step_name}_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True)
 
-        avg_loss = total_loss / len(train_loader)
-        accuracy = correct / total
-        return avg_loss, accuracy
+        # Log the details in a text file
+        with open(self.log_file, 'a') as f:
+            f.write(f'{step_name.capitalize()} Step: {self.global_step}\n')
+            f.write(f'Loss: {loss.item():.4f}\n')
+            f.write(f'Accuracy: {accuracy:.4f}\n')
+            f.write('\n')
 
-    def evaluate(self, data_loader):
-        self.model.eval()
-        total_loss = 0
-        correct = 0
-        total = 0
+        return loss
 
-        with torch.no_grad():
-            for inputs, labels in data_loader:
-                inputs = inputs.float().to(self.device)
-                labels = labels.long().to(self.device)
+    def configure_optimizers(self):
+        return self.optimizer
 
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+    def train_dataloader(self):
+        # Implement your own train data loader here
+        train_dataset = ...
+        train_loader = DataLoader(train_dataset, batch_size=..., shuffle=True)
+        return train_loader
 
-                total_loss += loss.item()
-
-                _, predicted = outputs.max(1)
-                correct += predicted.eq(labels).sum().item()
-                total += labels.size(0)
-
-        avg_loss = total_loss / len(data_loader)
-        accuracy = correct / total
-        return avg_loss, accuracy
+    def val_dataloader(self):
+        # Implement your own validation data loader here
+        val_dataset = ...
+        val_loader = DataLoader(val_dataset, batch_size=..., shuffle=False)
+        return val_loader
+    
+    def test_dataloader(self):
+        # Implement your own test data loader here
+        test_dataset = ...
+        test_loader = DataLoader(test_dataset, batch_size=..., shuffle=False)
+        return test_loader
 
 
-# def main():
-#     # Prepare the data
-#     train_loader = create_dataloader(mode='train', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=False, batch_size=128, shuffle=True)
-#     test_loader = create_dataloader(mode='test', vocab_path='vocab.pkl', vocab_threshold=1, vocab_from_file=True, batch_size=64, shuffle=False)
-#     # Define hyperparameters and model
-#     input_size = len(train_loader.dataset.vocab.word2index)  # Input size based on your data
-#     hidden_size = 105
-#     num_layers = 2
-#     num_classes = 7  # Number of classes based on your data
+def train():
+    # Instantiate the LightningTrainer
+    model = ...
+    criterion = ...
+    optimizer = ...
+    device = ...
+    logger = TensorBoardLogger('logs/', name='my_model')
+    trainer = pl.Trainer(
+        callbacks=[ModelCheckpoint(dirpath='checkpoints', filename='model-{epoch:02d}-{val_loss:.2f}', save_top_k=3)],
+        max_epochs=config.MAX_EPOCHS,
+        gpus=1 if torch.cuda.is_available() else 0
+    )
 
-#     model = LSTMModel(input_size, hidden_size, num_layers, num_classes).cuda()
-#     criterion = nn.CrossEntropyLoss()
-#     optimizer = optim.Adam(model.parameters(), lr=0.008)
-#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-#     # Training loop
-#     num_epochs = 1000
-
-#         # Instantiate the Trainer
-#     trainer = Trainer(model, criterion, optimizer, device)
-
-#     # Call the fit function
-#     trainer.fit(train_loader, test_loader, num_epochs)
+    # Train the model
+    lightning_trainer = LightningTrainer(model, criterion, optimizer, device)
+    trainer.fit(lightning_trainer)
 
 
 
-# if __name__ == "__main__":
-#     main()
+
+if __name__ == "__main__":
+    train()

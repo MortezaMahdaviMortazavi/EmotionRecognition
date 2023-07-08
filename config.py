@@ -8,7 +8,7 @@ HIDDEN_SIZE = None
 NUM_LAYERS = None
 LEARNING_RATE = None
 BATCH_SIZE = None
-MAX_LEN = 128
+MAX_SEQ_LEN = 128
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # PyTorch Lightning hyperparameters
@@ -25,7 +25,7 @@ HATRESS = None
 SADNESS = None
 
 # Addition
-NUMBER_OF_AUGMENTATION_WANTED = 300
+NUMBER_OF_AUGMENTATION_WANTED = 10
 
 
 # Path
@@ -35,7 +35,10 @@ ARMAN_VAL = 'datasets/arman-text-emotion-main/test.tsv'
 TEST_FILE = 'datasets/test.csv'
 TAGGER_MODEL_PATH = 'resources/pos_tagger.model'
 VOCAB_PATH = 'resources/vocab.pkl'
+VOCAB_THRESHOLD3_PATH = 'resources/vocab.pkl'
+
 LABELS_PATH = 'resources/labels.pkl'
+
 
 # Augmentation
 SWAP_P = 0.6
@@ -45,5 +48,5 @@ INSERTION_P = 0.3
 
 
 # Specific functions
-TOKENIZER = WordTokenizer.tokenize
+TOKENIZER = WordTokenizer()
 # VOCABULARY = 

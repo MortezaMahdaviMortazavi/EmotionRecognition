@@ -24,7 +24,7 @@ class Vocabulary:
         self.word2index = {}
         self.index2word = {}
         self.word2count = {}
-        self.max_text_length = config.MAX_LEN
+        self.max_text_length = config.MAX_SEQ_LEN
 
 
         self.preprocessor = Preprocessing(dataset=name)
@@ -141,9 +141,9 @@ if __name__ == "__main__":
         texts_val = f.readlines()
 
     texts_train.extend(texts_val)
-    texts = texts_val
-    
+    # texts = texts_val
+    texts = texts_train
     # print(f"texts length: {len(texts)}",f"texts_train length: {len(texts_train)}",f"texts_val length: {len(texts_val)}")
-    vocab = Vocabulary(texts=texts,vocab_threshold=2,name='arman')
+    vocab = Vocabulary(texts=texts,vocab_threshold=3,name='arman')
     print(vocab)
     

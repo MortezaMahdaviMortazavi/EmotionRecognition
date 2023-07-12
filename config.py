@@ -7,10 +7,10 @@ from transformers import AutoTokenizer
 # Pytorch
 HIDDEN_SIZE = None
 NUM_LAYERS = None
-LEARNING_RATE = None
-BATCH_SIZE = None
+LEARNING_RATE = 0.003
+BATCH_SIZE = 256
 NUM_CLASSES = 7
-MAX_SEQ_LEN = 128
+MAX_SEQ_LEN = 60
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # PyTorch Lightning hyperparameters
@@ -41,7 +41,11 @@ VOCAB_THRESHOLD3_PATH = 'resources/vocab.pkl'
 LABELS_PATH = 'resources/labels.pkl'
 CHECKPOINT_DIR = 'checkpoints/'
 LOGFILE = 'logs/logfile.txt'
-
+PREPROCESS_ARMAN_TRAIN_FILE = 'preprocessed_dataset/arman_train.txt'
+PREPROCESS_ARMAN_VAL_FILE = 'preprocessed_dataset/arman_val.txt'
+PREPROCESS_CONTEST_TEST_FILE = 'preprocessed_dataset/arman_train.txt'
+PREPROCESS_ARMAN_TRAIN_AUGMENT_FILE = 'preprocessed_dataset/arman_train_augmented.txt'
+PREPROCESS_ARMAN_VAL_AUGMENT_FILE = 'preprocessed_dataset/arman_val_augmented.txt'
 
 # Augmentation
 SWAP_P = 0.6

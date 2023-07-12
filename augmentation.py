@@ -1,44 +1,68 @@
 import pandas as pd
 import nlpaug.augmenter.word as naw
 import config
+import utils
 
 from tqdm import tqdm
 
-def augment():
-    # Labels : {'SAD': 0, 'HAPPY': 1, 'OTHER': 2, 'SURPRISE': 3, 'FEAR': 4, 'HATE': 5, 'ANGRY': 6}
-    targets = ["Anger", "Fear", "Happiness", "Hatred", "Sadness", "Wonder"]
-    target = targets[2]
+def augment(input_text):
+    augmented_data = []
 
-    df = pd.read_csv(f'/content/{target.lower()}.csv', usecols=["text", target])
-    df.head()
+    # Swap
+    aug = naw.RandomWordAug(action='swap', aug_p=config.SWAP_P)
+    augmented_text = aug.augment(input_text)
+    augmented_data.append(augmented_text)
 
-    df = df[(df[target] > 3) | (df[target] < 2)]
+    # Synonym replacement
+    aug = naw.ContextualWordEmbsAug(
+        model_path='HooshvareLab/bert-fa-base-uncased',
+        action="substitute",
+        aug_p=config.SYN_REPLACEMENT_P,
+        device='cuda'
+    )
+    augmented_text = aug.augment(input_text)
+    augmented_data.append(augmented_text)
 
-    df = df.replace([1], 0)
-    df = df.replace([4], 1)
-    df = df.replace([5], 1)
+    # Deletion
+    aug = naw.RandomWordAug(action='swap', aug_p=config.DELETION_P)
+    augmented_text = aug.augment(input_text)
+    augmented_data.append(augmented_text)
 
-    print(f'Value counts before augmentation: ')
-    print(df[target].value_counts())
+    # Insertion
+    aug = naw.ContextualWordEmbsAug(
+        model_path='HooshvareLab/bert-fa-base-uncased',
+        action="insert",
+        aug_p=config.INSERTION_P,
+        device='cuda'
+    )
+    augmented_text = aug.augment(input_text)
+    augmented_data.append(augmented_text)
 
-    texts = df[df[target] > 0]['text'].tolist()
+    return augmented_data
 
-    augmeneted_data = {"text": [], f"{target}": []}
 
-    for text in tqdm(texts):
-        for i in range(config.NUMBER_OF_AUGMENTATION_WANTED):
-            # Swap
-            aug = naw.RandomWordAug(action='swap', aug_p=config.SWAP_P)
-            augmented_text = aug.augment(text)
-            # Synonym replacement
-            aug = naw.ContextualWordEmbsAug(model_path='HooshvareLab/bert-fa-base-uncased', action="substitute", aug_p=config.SYN_REPLACEMENT_P, device=config.DEVICE)
-            augmented_text = aug.augment(augmented_text)
-            # Deletion
-            aug = naw.RandomWordAug(action='swap', aug_p=config.DELETION_P)
-            augmented_text = aug.augment(augmented_text)
-            # Insertion
-            aug = naw.ContextualWordEmbsAug(model_path='HooshvareLab/bert-fa-base-uncased', action="insert", aug_p=config.INSERTION_P, device=config.DEVICE)
-            augmented_text = aug.augment(augmented_text)
+def augment_dataset(datatype='train'):
+    assert datatype in ['train','val']
+    texts = []
+    targets = []
+    if datatype == 'train':
+        filepath = config.PREPROCESS_ARMAN_TRAIN_FILE
+        augment_file = config.PREPROCESS_ARMAN_TRAIN_AUGMENT_FILE
 
-            augmeneted_data["text"].append(augmented_text)
-            augmeneted_data[target].append(1)
+    elif datatype == 'val':
+        filepath = config.PREPROCESS_ARMAN_VAL_FILE
+        augment_file = config.PREPROCESS_ARMAN_VAL_AUGMENT_FILE
+
+    with open(filepath,'r',encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    print("--------------------Getting the preprocessed text from file start----------------------")
+    for line in lines:
+        text , label = line.split('--->')
+        text = text.strip()
+        label = label.strip()
+        data_augment_samples = augment(text)
+        for sample in tqdm(data_augment_samples):
+            utils.write_text_to_file(sample[0] + '--->' + str(label)+'\n',file_path=augment_file)
+
+    del lines

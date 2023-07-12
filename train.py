@@ -6,95 +6,176 @@ from torch.optim import optimizer
 from torch.utils.data import DataLoader
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+from sklearn.metrics import f1_score
+from dataset import ArmanDataset,create_dataloader
+from tqdm import tqdm
 
 import config
 import utils
 
-class LightningTrainer(pl.LightningModule):
-    def __init__(self, model, criterion, optimizer, device, log_file):
-        super().__init__()
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import numpy as np
+
+class Trainer:
+    def __init__(self, model, criterion, optimizer, device):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
-        self.log_file = log_file
+        self.log_file = config.LOGFILE
+        self.train_losses = []
+        self.valid_losses = []
+        self.train_accuracies = []
+        self.valid_accuracies = []
 
-    def forward(self, x, attention_mask):
-        return self.model(x, attention_mask=attention_mask)
+    def fit(self, train_loader, valid_loader, num_epochs):
+        best_val_acc = 0
+        for epoch in tqdm(range(num_epochs)):
+            print(f"Epoch {epoch+1}/{num_epochs}", end=" | ")
+            train_loss, train_acc , train_f1_score = self.train_one_epoch(train_loader)
+            valid_loss, valid_acc , val_f1_score = self.evaluate(valid_loader)
+            self.train_losses.append(train_loss)
+            self.valid_losses.append(valid_loss)
+            self.train_accuracies.append(train_acc)
+            self.valid_accuracies.append(valid_acc)
+            print(f"Train Loss: {train_loss:.4f} Accuracy: % {train_acc * 100:.4f}", end="  ")
+            print(f"Train F1 Score: {train_f1_score:.4f}",end=" | ")
+            print(f"Valid Loss: {valid_loss:.4f} Accuracy: % {valid_acc * 100:.4f}")
+            print(f"Val F1 Score: {val_f1_score:.4f}",end=" | ")
+            with open(self.log_file, 'a') as f:
+                f.write(f"Epoch {epoch} | ")
+                f.write(f'Train Loss: {train_loss:.4f} | ')
+                f.write(f'Train Accuracy: {train_acc:.4f} | ')
+                f.write(f'Train f1_score: {train_f1_score:.4f} | ')
+                f.write(f'Val Loss: {valid_loss:.4f} | ')
+                f.write(f'Val Accuracy: {valid_acc:.4f} | ')
+                f.write(f'Val f1_score: {val_f1_score:.4f} | ')
+                f.write('\n')
 
-    def common_step(self, batch, step_name):
-        inputs = batch["input"].to(self.device)
-        attention_masks = batch["mask"].to(self.device)
-        labels = batch["label"].to(self.device)
+            # Save the model if validation accuracy improves
+            if valid_acc > best_val_acc:
+                best_val_acc = valid_acc
+                checkpoint = {
+                    'epoch': epoch + 1,
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'train_loss': train_loss,
+                    'train_acc': train_acc,
+                    'train_f1_score': train_f1_score,
+                    'valid_loss': valid_loss,
+                    'valid_acc': valid_acc,
+                    'val_f1_score': val_f1_score
+                }
+                torch.save(checkpoint, 'checkpoints/model_checkpoint.pth')
 
-        outputs = self.model(inputs, attention_mask=attention_masks)
-        loss = self.criterion(outputs, labels)
+    def train_one_epoch(self, train_loader):
+        self.model.train()
+        total_loss = 0
+        correct = 0
+        total = 0
+        _f1_point = 0
 
-        _, predicted = outputs.max(1)
-        accuracy = torch.sum(predicted == labels).item() / labels.size(0)
+        for sample in train_loader:
+            inputs = sample['input']
+            labels = sample['label']
+            masks = sample['mask'].to(self.device) 
 
-        self.log(f'{step_name}_loss', loss, on_step=step_name == "train", on_epoch=True, prog_bar=True)
-        self.log(f'{step_name}_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True)
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
 
-        # Log the details in a text file
-        with open(self.log_file, 'a') as f:
-            f.write(f'{step_name.capitalize()} Step: {self.global_step}\n')
-            f.write(f'Loss: {loss.item():.4f}\n')
-            f.write(f'Accuracy: {accuracy:.4f}\n')
-            f.write('\n')
+            self.optimizer.zero_grad()
 
-        return loss
+            outputs = self.model(inputs,masks)
+            loss = self.criterion(outputs, labels)
+            loss.backward()
+            self.optimizer.step()
 
-    def training_step(self, batch, batch_idx):
-        return self.common_step(batch, step_name="train")
+            total_loss += loss.item()
 
-    def validation_step(self, batch, batch_idx):
-        return self.common_step(batch, step_name="val")
+            _, predicted = outputs.max(1)
+            f1 = f1_score(labels.cpu().numpy(), predicted.cpu().numpy(),average='macro')
+            _f1_point += f1
+            correct += predicted.eq(labels).sum().item()
+            total += labels.size(0)
 
-    def test_step(self, batch, batch_idx):
-        return self.common_step(batch, step_name="test")
+        _f1_point/=len(train_loader)
+        avg_loss = total_loss / len(train_loader)
+        accuracy = correct / total
+        return avg_loss, accuracy , _f1_point
 
-    def configure_optimizers(self):
-        return self.optimizer
+    def evaluate(self, data_loader):
+        self.model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+        _f1_point = 0
 
-    def train_dataloader(self):
-        # Implement your own train data loader here
-        train_dataset = ...
-        train_loader = DataLoader(train_dataset, batch_size=..., shuffle=True)
-        return train_loader
+        with torch.no_grad():
+            for sample in data_loader:
+                inputs = sample['input']
+                labels = sample['label']
+                masks = sample['mask'].to(self.device) 
+                
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
 
-    def val_dataloader(self):
-        # Implement your own validation data loader here
-        val_dataset = ...
-        val_loader = DataLoader(val_dataset, batch_size=..., shuffle=False)
-        return val_loader
+                outputs = self.model(inputs,masks)
+                loss = self.criterion(outputs, labels)
 
-    def test_dataloader(self):
-        # Implement your own test data loader here
-        test_dataset = ...
-        test_loader = DataLoader(test_dataset, batch_size=..., shuffle=False)
-        return test_loader
+                total_loss += loss.item()
 
+                _, predicted = outputs.max(1)
+            
+                f1 = f1_score(labels.cpu().numpy(), predicted.cpu().numpy(),average='macro')
+                _f1_point += f1
+
+                correct += predicted.eq(labels).sum().item()
+                total += labels.size(0)
+
+        _f1_point/=len(data_loader)
+        avg_loss = total_loss / len(data_loader)
+        accuracy = correct / total
+        return avg_loss, accuracy,_f1_point
+
+
+def main(model):
+    # Prepare the data
+    train_loader = create_dataloader(dataset_type='train',is_preprocess=True,load_vocab=True,shuffle=False)
+    val_loader = create_dataloader(dataset_type='val',is_preprocess=True,shuffle=True)
+    # Define hyperparameters and model
+
+    _model = model.cuda()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(_model.parameters(), lr=0.003)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Training loop
+    num_epochs = 1000
+
+    trainer = Trainer(_model, criterion, optimizer, device)
+
+    # Call the fit function
+    trainer.fit(train_loader, val_loader, num_epochs)
+
+
+
+# if __name__ == "__main__":
+#     main()
         
-def train():
-    # Instantiate the LightningTrainer
-    model = ...
-    criterion = ...
-    optimizer = ...
-    device = ...
-    logger = TensorBoardLogger('logs/', name='my_model')
-    trainer = pl.Trainer(
-        callbacks=[ModelCheckpoint(dirpath='checkpoints', filename='model-{epoch:02d}-{val_loss:.2f}', save_top_k=3)],
-        max_epochs=config.MAX_EPOCHS,
-        gpus=1 if torch.cuda.is_available() else 0
-    )
+# def train(model):
+#     # Instantiate the LightningTrainer
+#     criterion = nn.CrossEntropyLoss()
+#     optimizer = torch.optim.Adam(model.parameters(),lr=config.LEARNING_RATE)
+#     device = config.DEVICE
+#     logger = TensorBoardLogger('logs/', name='my_model')
+#     trainer = pl.Trainer(
+#         callbacks=[ModelCheckpoint(dirpath='checkpoints', filename='model-{epoch:02d}-{val_loss:.2f}', save_top_k=3,monitor='val_loss')],
+#         max_epochs=config.MAX_EPOCHS,
+#     )
 
-    # Train the model
-    lightning_trainer = LightningTrainer(model, criterion, optimizer, device)
-    trainer.fit(lightning_trainer)
-
-
-
-
-if __name__ == "__main__":
-    train()
+#     # Train the model
+#     lightning_trainer = LightningTrainer(model, criterion, optimizer)
+#     trainer.fit(lightning_trainer)

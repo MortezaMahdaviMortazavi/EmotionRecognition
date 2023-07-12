@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import config
 import hazm
+import utils
 
 from tqdm import tqdm
 from preprocessing import Preprocessing
@@ -11,11 +12,13 @@ class ArmanDataset(torch.utils.data.Dataset):
     def __init__(
             self,
             dataset_type,
+            is_preprocess=True,
             tokenizer_type='hazm',
             load_vocab=True   
         ):
         assert dataset_type in ['train', 'val']
         assert tokenizer_type in ['hazm', 'parsbert']
+        self.is_preprocess = is_preprocess
         self.dataset_type = dataset_type
         self.tokenizer_type = tokenizer_type
         self.texts = [] # the text in each sample of dataset
@@ -30,19 +33,44 @@ class ArmanDataset(torch.utils.data.Dataset):
         self.extract_data()
     
     def extract_data(self):
-        file_path = config.ARMAN_TRAIN if self.dataset_type == 'train' else config.ARMAN_VAL
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                texts = [line.rstrip() for line in tqdm(f)]
-        except FileNotFoundError:
-            print(f"Error: File {file_path} not found.")
-        except IOError as e:
-            print(f"Error: {e}")        
+        if self.is_preprocess:
+            if self.dataset_type == 'train':
+                filepath = config.PREPROCESS_ARMAN_TRAIN_FILE
+            elif self.dataset_type == 'val':
+                filepath = config.PREPROCESS_ARMAN_VAL_FILE
+            
+            elif self.dataset_type == 'test':
+                filepath = config.PREPROCESS_CONTEST_TEST_FILE
 
-        for text in tqdm(texts[:50]):
-            clean_text , target = self.preprocessor(text)
-            self.texts.append(clean_text)
-            self.targets.append(target)
+            with open(filepath,'r',encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            print("--------------------Getting the preprocessed text from file start----------------------")
+            for line in tqdm(lines):
+                text , label = line.split('--->')
+                text = text.strip()
+                label = label.strip()
+                self.texts.append(text)
+                self.targets.append(label)
+
+            del lines
+
+
+        else:     
+            file_path = config.ARMAN_TRAIN if self.dataset_type == 'train' else config.ARMAN_VAL
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    texts = [line.rstrip() for line in tqdm(f)]
+            except FileNotFoundError:
+                print(f"Error: File {file_path} not found.")
+            except IOError as e:
+                print(f"Error: {e}")        
+
+            for text in tqdm(texts):
+                clean_text , target = self.preprocessor(text)
+                utils.write_text_to_file(text=clean_text + " ---> " + target + "\n",file_path='logs/preprocess_logs.txt')
+                self.texts.append(clean_text)
+                self.targets.append(target)
 
     def __len__(self):
         return len(self.texts)
@@ -66,8 +94,8 @@ class ArmanDataset(torch.utils.data.Dataset):
         attention_mask = [1] * len(input_ids)
 
         # Convert to tensors
-        padded_input_ids = torch.tensor(input_ids).unsqueeze(0)
-        padded_attention_mask = torch.tensor(attention_mask).unsqueeze(0)
+        padded_input_ids = torch.tensor(input_ids)
+        padded_attention_mask = torch.tensor(attention_mask)
         label = torch.tensor(target)
 
         _instance = {
@@ -79,30 +107,15 @@ class ArmanDataset(torch.utils.data.Dataset):
         return _instance
 
 
-def create_dataloader(
-    dataset_type,
-    tokenizer_type='hazm',
-    load_vocab=True,
-    batch_size=32,
-    shuffle=True,
-    num_workers=0
-):
-    dataset = ArmanDataset(
-        dataset_type=dataset_type,
-        tokenizer_type=tokenizer_type,
-        load_vocab=load_vocab
-    )
-
-    dataloader = torch.utils.data.DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers
-    )
-
-    return dataloader
+def create_dataloader(dataset_type='train',is_preprocess=True,load_vocab=True,shuffle=True):
+    dataset = ArmanDataset(dataset_type=dataset_type,is_preprocess=is_preprocess,load_vocab=load_vocab)
+    return torch.utils.data.DataLoader(dataset,batch_size=config.BATCH_SIZE,shuffle=shuffle)
 
 
-if __name__ == "__main__":
-    dataloader = create_dataloader('val',)
-    print(len(dataloader.dataset))
+# def handle_contest_dataset(path=None):
+#     pass
+
+
+# if __name__ == "__main__":
+#     dataset = ArmanDataset('val')
+#     print(dataset)

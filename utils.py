@@ -1,8 +1,27 @@
-
+import csv
 import pandas as pd
 import pickle
+import torch
 
 from sklearn.model_selection import train_test_split
+
+
+def tsv2csv(tsv_file,csv_file):
+    # Open the TSV file for reading
+    with open(tsv_file, "r", encoding="utf-8") as tsv:
+        # Create a CSV file for writing
+        with open(csv_file, "w", encoding="utf-8", newline="") as csvf:
+            writer = csv.writer(csvf)
+            writer.writerow(["text", "label"])  # Write the header row
+
+            # Read each line in the TSV file and convert it to CSV format
+            for line in tsv:
+                line = line.strip().split("\t")
+                text = line[0]
+                label = line[1]
+
+                writer.writerow([text, label])  # Write the row in CSV format
+
 
 def read_data(address):
     cleaning = None
@@ -45,9 +64,17 @@ def load_vocab(path):
         vocab = pickle.load(file)
     return vocab
 
-# # Example usage
-# vocab = {'apple': 1, 'banana': 2, 'orange': 3}
-# save_vocab(vocab, 'vocab.pkl')
+def load_checkpoint(model, optimizer, checkpoint_path):
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    train_loss = checkpoint['train_loss']
+    train_acc = checkpoint['train_acc']
+    train_f1 = checkpoint['train_f1_score']
+    val_loss = checkpoint['valid_loss']
+    val_acc = checkpoint['valid_acc']
+    val_f1 = checkpoint['valid_f1_score']
+    
+    return epoch, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1
 
-# loaded_vocab = load_vocab('vocab.pkl')
-# print(loaded_vocab)

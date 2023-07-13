@@ -3,113 +3,71 @@ import numpy as np
 import config
 import hazm
 import utils
+import pandas as pd
 
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from preprocessing import Preprocessing
-from vocabulary import Vocabulary
+from transformers import AutoTokenizer
 
-class ArmanDataset(torch.utils.data.Dataset):
-    def __init__(
-            self,
-            dataset_type,
-            is_preprocess=True,
-            tokenizer_type='hazm',
-            load_vocab=True   
-        ):
-        assert dataset_type in ['train', 'val']
-        assert tokenizer_type in ['hazm', 'parsbert']
-        self.is_preprocess = is_preprocess
-        self.dataset_type = dataset_type
-        self.tokenizer_type = tokenizer_type
-        self.texts = [] # the text in each sample of dataset
-        self.targets = [] # the labels or targets of each sample
-        self.tokenizer = config.TOKENIZER # tokenizer that tokenize the text
-        self.preprocessor = Preprocessing(dataset='arman') # return text and its target while we call it with a text input
-        self.has_target = isinstance(self.targets, list) or isinstance(self.targets, np.ndarray)
+def get_data(train_path,test_path,cleaner):
+    text_cleaner = cleaner
+    train_df = pd.read_csv(train_path,encoding='utf-8')
+    test_df = pd.read_csv(test_path,encoding='utf-8')
+    train_df['text'] = train_df['text'].apply(text_cleaner)
+    test_df['text'] = test_df['text'].apply(text_cleaner)
+    X, y = train_df['text'], train_df['label']
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=1)
+    X_test,y_test = test_df['text'] , test_df['label']
+    X_train, y_train = X_train.values.tolist(), y_train.values.tolist()
+    X_val, y_val = X_val.values.tolist(), y_val.values.tolist()
+    X_test, y_test = X_test.values.tolist(), y_test.values.tolist()
+    return X_train,y_train,X_val,y_val,X_test,y_test
 
-
-        self.labels_dict = {'SAD': 0, 'HAPPY': 1, 'OTHER': 2, 'SURPRISE': 3, 'FEAR': 4, 'HATE': 5, 'ANGRY': 6}
-        self.vocab = Vocabulary(self.texts,vocab_threshold=2,name='arman',load=load_vocab)
-        self.extract_data()
-    
-    def extract_data(self):
-        if self.is_preprocess:
-            if self.dataset_type == 'train':
-                filepath = config.PREPROCESS_ARMAN_TRAIN_FILE
-            elif self.dataset_type == 'val':
-                filepath = config.PREPROCESS_ARMAN_VAL_FILE
-            
-            elif self.dataset_type == 'test':
-                filepath = config.PREPROCESS_CONTEST_TEST_FILE
-
-            with open(filepath,'r',encoding='utf-8') as f:
-                lines = f.readlines()
-            
-            print("--------------------Getting the preprocessed text from file start----------------------")
-            for line in tqdm(lines):
-                text , label = line.split('--->')
-                text = text.strip()
-                label = label.strip()
-                self.texts.append(text)
-                self.targets.append(label)
-
-            del lines
+def test_data_handler(cleaner):
+    df = pd.read_csv(config.TEST_FILE,encoding='utf-8')
+    df = df[['tweet', 'primary_emotion']]
+    df.columns = ['text', 'label']
+    df.to_csv(config.MODIFIED_TEST, index=False)
+    return df
 
 
-        else:     
-            file_path = config.ARMAN_TRAIN if self.dataset_type == 'train' else config.ARMAN_VAL
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    texts = [line.rstrip() for line in tqdm(f)]
-            except FileNotFoundError:
-                print(f"Error: File {file_path} not found.")
-            except IOError as e:
-                print(f"Error: {e}")        
-
-            for text in tqdm(texts):
-                clean_text , target = self.preprocessor(text)
-                utils.write_text_to_file(text=clean_text + " ---> " + target + "\n",file_path='logs/preprocess_logs.txt')
-                self.texts.append(clean_text)
-                self.targets.append(target)
+class TextDataset(torch.utils.data.Dataset):
+    def __init__(self, texts, labels, max_length):
+        self.texts = texts
+        self.labels = labels
+        self.tokenizer = AutoTokenizer.from_pretrained('HooshvareLab/bert-base-parsbert-uncased')
+        self.max_length = config.MAX_SEQ_LEN
+        self.labels_dict = {'SAD': 0, 'HAPPY': 1,'SURPRISE': 2, 'FEAR': 3, 'HATE': 4, 'ANGRY': 5,'OTHER': 6,}
 
     def __len__(self):
-        return len(self.texts)
-    
-    def __repr__(self):
-        return f"Sample: {self[1]}"
-    
+        return len(self.labels)
+
     def __getitem__(self, idx):
         text = self.texts[idx]
-        if self.has_target:
-            target = self.labels_dict[self.targets[idx]]
-
-        tokenized_text = self.tokenizer.tokenize(text)
-
-        if len(tokenized_text) < config.MAX_SEQ_LEN:
-            tokenized_text += ['[PAD]'] * (config.MAX_SEQ_LEN - len(tokenized_text))
-        else:
-            tokenized_text = tokenized_text[:config.MAX_SEQ_LEN]
-
-        input_ids = self.tokenizer.convert_tokens_to_ids(tokenized_text)
-        attention_mask = [1] * len(input_ids)
-
-        # Convert to tensors
-        padded_input_ids = torch.tensor(input_ids)
-        padded_attention_mask = torch.tensor(attention_mask)
-        label = torch.tensor(target)
-
-        _instance = {
-            "input":padded_input_ids,
-            "label":label,
-            "mask":padded_attention_mask
+        label = self.labels[idx]
+        encoding = self.tokenizer.encode_plus(
+            text,
+            add_special_tokens=True,
+            truncation=True,
+            max_length=self.max_length,
+            padding='max_length',
+            return_attention_mask=True,
+            return_tensors='pt'
+        )
+        inputs = {
+            'input_ids': encoding['input_ids'].squeeze(),
+            'attention_mask': encoding['attention_mask'].squeeze(),
+            'labels': torch.tensor(self.labels_dict[label])
         }
+        return inputs
 
-        return _instance
 
 
-def create_dataloader(dataset_type='train',is_preprocess=True,load_vocab=True,shuffle=True):
-    dataset = ArmanDataset(dataset_type=dataset_type,is_preprocess=is_preprocess,load_vocab=load_vocab)
-    return torch.utils.data.DataLoader(dataset,batch_size=config.BATCH_SIZE,shuffle=shuffle)
+def create_dataloader(texts, labels,shuffle=True):
+    dataset = TextDataset(texts, labels, max_length=config.MAX_SEQ_LEN)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=config.BATCH_SIZE, shuffle=shuffle)
+    return dataloader
 
 
 # def handle_contest_dataset(path=None):

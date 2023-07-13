@@ -10,7 +10,7 @@ NUM_LAYERS = None
 LEARNING_RATE = 0.003
 BATCH_SIZE = 256
 NUM_CLASSES = 7
-MAX_SEQ_LEN = 60
+MAX_SEQ_LEN = 64
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # PyTorch Lightning hyperparameters
@@ -32,8 +32,8 @@ NUMBER_OF_AUGMENTATION_WANTED = 10
 
 # Path
 PARS_EMO = 'datasets/Persian-Emotion-Detection-main/dataset.csv'
-ARMAN_TRAIN = 'datasets/arman-text-emotion-main/train.tsv'
-ARMAN_VAL = 'datasets/arman-text-emotion-main/test.tsv'
+ARMAN_TRAIN = 'datasets/arman-text-emotion-main/train.csv'
+ARMAN_VAL = 'datasets/arman-text-emotion-main/test.csv'
 TEST_FILE = 'datasets/test.csv'
 TAGGER_MODEL_PATH = 'resources/pos_tagger.model'
 VOCAB_PATH = 'resources/vocab.pkl'
@@ -46,7 +46,7 @@ PREPROCESS_ARMAN_VAL_FILE = 'preprocessed_dataset/arman_val.txt'
 PREPROCESS_CONTEST_TEST_FILE = 'preprocessed_dataset/arman_train.txt'
 PREPROCESS_ARMAN_TRAIN_AUGMENT_FILE = 'preprocessed_dataset/arman_train_augmented.txt'
 PREPROCESS_ARMAN_VAL_AUGMENT_FILE = 'preprocessed_dataset/arman_val_augmented.txt'
-
+MODIFIED_TEST = 'datasets/modified_test.csv'
 # Augmentation
 SWAP_P = 0.6
 SYN_REPLACEMENT_P = 0.6

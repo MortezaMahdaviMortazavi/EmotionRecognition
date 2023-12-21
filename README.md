@@ -1,2 +1,2 @@
 # EmotionRecognition
-Code for Emotion recognition context for persian language
+Code for Emotion recognition contest for persian language

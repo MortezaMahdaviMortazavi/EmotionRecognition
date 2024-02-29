@@ -1,143 +1,212 @@
-import pandas as pd
-from transformers import AutoTokenizer, AutoModelForMaskedLM
 import torch
+import torch.nn as nn
+import numpy as np
+import config
+from torch.optim import Adam
 from torch.utils.data import DataLoader
-from transformers import AdamW
-import torch.nn as nn
-from transformers import XLMRobertaForSequenceClassification, AdamW, get_linear_schedule_with_warmup
-
-
-batch_size = 16
-learning_rate = 1e-5
-num_epochs = 5
-
-# Load the pre-trained tokenizer
-tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large')
-test = pd.read_csv('test_cleaned_emopars.csv', index_col=0)
-train = pd.read_csv('train_cleaned_emopars.csv', index_col=0)
-targets = ["Anger", "Fear", "Happiness", "Hatred", "Sadness", "Wonder"]
-def preprocess(df):
-    # Normalize emotion labels
-    emotion_columns = ['Anger', 'Fear', 'Happiness', 'Hatred', 'Sadness', 'Wonder']
-
-    for col in emotion_columns:
-        df[col] = df[col] / df[col].max()  # Normalize to the range [0, 1]
-
-    # Apply threshold for binary labels
-    threshold = 0.35
-    for col in emotion_columns:
-        df[col] = df[col].apply(lambda x: 1 if x >= threshold else 0)
-
-    return df
-train = pd.concat([train,test])
-train = preprocess(train)
-test = preprocess(test)
-X_train, y_train = train['text'].values.tolist(), train[targets].values.tolist()
-X_test, y_test = test['text'].values.tolist(), test[targets].values.tolist()
-
-
-class TextDataset(torch.utils.data.Dataset):
-    def __init__(self, tokenizer, texts, labels, max_length=128):
-        self.texts = texts
-        self.labels = labels
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, idx):
-        text = self.texts[idx]
-        label = self.labels[idx]
-
-        encoding = self.tokenizer.encode_plus(
-            text,
-            add_special_tokens=True,
-            truncation=True,
-            max_length=self.max_length,
-            padding='max_length',
-            return_attention_mask=True,
-            return_tensors='pt'
-        )
-
-        inputs = {
-            'input_ids': encoding['input_ids'].squeeze(),
-            'attention_mask': encoding['attention_mask'].squeeze(),
-            'labels': torch.tensor(label, dtype=torch.float32)  # Use the provided numeric label directly
-        }
-
-        return inputs
-
-train_dataset = TextDataset(tokenizer,X_train,y_train,max_length=128)
-test_dataset = TextDataset(tokenizer,X_test,y_test,max_length=128)
-
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
-import torch.nn as nn
-
-# Define the loss function
-criterion = nn.BCEWithLogitsLoss()
-# Check if CUDA (GPU) is available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 from transformers import AutoModel
+from sklearn.metrics import accuracy_score , f1_score
+from dataclasses import dataclass
 
-class XLMRobertaGRUClassifier(nn.Module):
-    def __init__(self, num_classes):
-        super(XLMRobertaGRUClassifier, self).__init__()
-        self.num_classes = num_classes
-        self.xlmroberta = AutoModel.from_pretrained("xlm-roberta-large")
-
-        # Add a GRU layer
-        self.gru = nn.GRU(self.xlmroberta.config.hidden_size, hidden_size=self.xlmroberta.config.hidden_size, num_layers=1, batch_first=True)
-
-        # # Correct the hidden size for the linear layer
-        self.linear = nn.Linear(self.xlmroberta.config.hidden_size, num_classes)  # Multiply by 2 for bidirectional GRU
-        self.dropout = nn.Dropout(0.2)
-
-    def forward(self, input_ids, attention_mask):
-        outputs = self.xlmroberta(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
-        logits = outputs.last_hidden_state
-
-        # Pass the logits through the GRU layer
-        gru_output, _ = self.gru(logits)
-
-        logits = self.linear(self.dropout(gru_output[:, -1, :]))
-        return logits
-    
-epochs = 5
-num_classes = 6
-model = XLMRobertaGRUClassifier(num_classes)
-model.to(device)  # Move model to GPU if available
-optimizer = AdamW(model.parameters(), lr=learning_rate)
-total_steps = len(train_dataloader) * epochs
-scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+import logging
+from logging.handlers import RotatingFileHandler
 from tqdm import tqdm
-for epoch in range(epochs):
-    model.train()
-    total_loss = 0
-    idx = 0
-    for batch in tqdm(train_dataloader, desc=f"Epoch {epoch + 1}"):
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        labels = batch['labels'].to(device)
 
-        optimizer.zero_grad()
+@dataclass
+class TrainConfig:
+    NUM_EPOCHS: int = 5
 
-        logits = model(input_ids, attention_mask)
-        loss = criterion(logits, labels)
+import torch
+from torch import nn
+from torch.nn.functional import cross_entropy
+
+
+def f1_score(y_true, y_pred, average='macro'):
+    """Calculates F1-score (weighted harmonic mean of precision and recall) for multi-class classification.
+
+    Args:
+        y_true (torch.Tensor): Ground-truth labels (one-hot encoded).
+        y_pred (torch.Tensor): Predicted class probabilities.
+        average (str, optional): Averaging strategy ('micro', 'macro', 'samples', or 'none').
+            - 'micro': Calculate overall F1-score across all classes.
+            - 'macro': Calculate F1-score for each class and average.
+            - 'samples': Calculate F1-score for each sample and average.
+            - 'none': Return F1-score for each class without averaging.
+            Defaults to 'macro'.
+
+    Returns:
+        torch.Tensor: F1-score(s).
+    """
+
+    assert y_true.size() == y_pred.size()
+    y_true = y_true.type(torch.float32)
+    y_pred = y_pred.type(torch.float32)
+
+    # True positives (tp), false positives (fp), false negatives (fn) per class
+    tp = torch.sum(y_pred * y_true, dim=0)
+    fp = torch.sum(y_pred * (1 - y_true), dim=0)
+    fn = torch.sum((1 - y_pred) * y_true, dim=0)
+
+    # Precision, recall, F1-score per class
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    f1 = 2 * precision * recall / (precision + recall)
+
+    if average == 'micro':
+        # Micro-average: F1-score across all classes (weighted by support)
+        support = torch.sum(y_true, dim=0)
+        f1 = (f1 * support).sum() / torch.sum(support)
+    elif average == 'macro':
+        # Macro-average: Average F1-score across classes
+        f1 = torch.mean(f1)
+    elif average == 'samples':
+        # Sample-average: F1-score for each sample and average
+        f1 = torch.mean(f1, dim=0)
+    elif average == 'none':
+        # Return F1-score for each class without averaging
+        pass
+    else:
+        raise ValueError(f"Invalid average method: {average}")
+
+    return f1
+
+
+
+def dynamic_class_weighting(model, criterion, optimizer, num_classes, f1_weight=0.2, epsilon=1e-9):
+    """Dynamically adjusts class weights in PyTorch loss function based on F1-score.
+
+    Args:
+        model (nn.Module): PyTorch model for classification.
+        criterion (nn.Module): PyTorch loss function (e.g., nn.CrossEntropyLoss).
+        optimizer (torch.optim.Optimizer): PyTorch optimizer.
+        num_classes (int): Number of classes in the classification task.
+        f1_weight (float, optional): Weight for F1-score in loss weighting calculation. Defaults to 0.2.
+        epsilon (float, optional): Small value added to avoid division by zero. Defaults to 1e-9.
+
+    Returns:
+        None
+    """
+
+
+    # Calculate F1-score for each class
+    f1 = f1_score(batch_labels, predictions, average='macro')
+    class_weights = 1 / (f1 + epsilon)  # Inversely proportional to F1
+
+    # Normalize class weights
+    class_weights = class_weights / class_weights.sum()
+
+    # Create or update weight tensor (device agnostic)
+    weight_tensor = torch.from_numpy(class_weights).float().to(outputs.device)
+
+    # Set weights for criterion (if supported) or create custom weighted loss
+    if hasattr(criterion, 'weight'):
+        criterion.weight = weight_tensor
+    else:
+        def weighted_loss(outputs, target):
+            pass
+
+
+
+class Trainer:
+    def __init__(self, model, criterion, optimizer, device=config.DEVICE,num_gpus=1,log_file_path=config.LOG_FILE_PATH):
+        self.criterion = criterion
+        self.optimizer = optimizer
+        self.device = device
+        self.num_gpus = num_gpus
+        if self.num_gpus > 1 and torch.cuda.is_available():
+            self.model = nn.DataParallel(model)
+        else:
+            self.model = model
+
+        self.logger = self.setup_logger(log_file_path)
+
+    def setup_logger(self, log_file_path):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+        handler = RotatingFileHandler(log_file_path, maxBytes=10*1024*1024, backupCount=5)  # 10 MB per file, keep 5 backup files
+        handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return logger
+
+    def log_info(self, message):
+        self.logger.info(message)
+
+    def to_device(self, data):
+        if self.num_gpus > 1 and torch.cuda.is_available():
+            return {key: value.to(self.device) for key, value in data.items()}
+        else:
+            return data.to(self.device)
+
+    def train_step(self, data):
+        self.model.train()
+        batch = data
+        inputs , attention_mask , targets = self.to_device(batch['input_ids']) , self.to_device(batch['attention_mask']) , self.to_device(batch['labels'])
+        self.optimizer.zero_grad()
+
+        outputs = self.model(inputs,attention_mask).logits
+
+        loss = self.criterion(outputs, targets)
+
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Optional gradient clipping
-        optimizer.step()
-        scheduler.step()
+        self.optimizer.step()
 
-        total_loss += loss.item()
-        if idx % 20 == 0:
-            print(f"batch loss: {loss.item():.4f}")
-        idx +=1
+        return loss.item()
 
-    average_loss = total_loss / len(train_dataloader)
-    print('-' * 80)
-    print(f"Epoch {epoch + 1} - Average Loss: {average_loss:.4f}")
+    def evaluation_step(self, data):
+        self.model.eval()
+        batch = data
+        inputs , attention_mask , targets = self.to_device(batch['input_ids']) , self.to_device(batch['attention_mask']) , self.to_device(batch['labels'])
 
-# Save your trained model
-    torch.save(model.state_dict(), 'xlmrobertalarge_gru_model.pth')
+        with torch.no_grad():
+            outputs = self.model(inputs,attention_mask).logits
+
+        predictions = torch.argmax(outputs, dim=1) if targets is not None else None
+
+        targets_np = targets.cpu().numpy() if targets is not None else None
+        predictions_np = predictions.cpu().numpy() if predictions is not None else None
+
+        return targets_np, predictions_np, outputs.cpu().numpy()
+
+
+    def evaluate(self, dataloader):
+        total_loss = 0
+        total_samples = 0
+
+        for data in tqdm(dataloader):
+            targets, predictions, outputs = self.evaluation_step(data)
+
+
+            if outputs is not None:
+                outputs_tensor = torch.from_numpy(outputs).to(self.device)  # Convert NumPy array to PyTorch tensor
+                targets_tensor = torch.from_numpy(targets).to(self.device)
+                total_loss += self.criterion(outputs_tensor, targets_tensor).item()
+                total_samples += len(data)
+
+        avg_loss = total_loss / total_samples if total_samples > 0 else None
+        return avg_loss
+
+
+    def __call__(self, train_dataloader, test_dataloader, num_epochs):
+        for epoch in range(num_epochs):
+            self.log_info(f"Epoch {epoch + 1}/{num_epochs}:")
+
+            # Training
+            self.model.train()
+            total_train_loss = 0
+            total_train_samples = 0
+
+            for train_data in tqdm(train_dataloader):
+                train_loss = self.train_step(train_data)
+                total_train_loss += train_loss if train_loss is not None else 0
+                total_train_samples += len(train_data)
+
+
+            avg_train_loss = total_train_loss / total_train_samples if total_train_samples > 0 else None
+            self.log_info(f"  Train Loss: {avg_train_loss}")
+            torch.save(self.model.state_dict(),config.CHECKPOINT_PATH)
+            # Testing
+            avg_test_loss = self.evaluate(test_dataloader)
+            self.log_info(f"  Test Loss: {avg_test_loss}")
+            self.log_info("=" * 30)
